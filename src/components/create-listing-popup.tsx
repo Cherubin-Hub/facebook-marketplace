@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image"; // Added import for next/image
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-const categories = [
+const categories: string[] = [
   "Vehicles",
   "Property Rentals",
   "Apparel",
@@ -28,7 +29,7 @@ const categories = [
   "Buy and sell groups",
 ];
 
-export function CreateListingPopup({ children, onCreated }: { children: React.ReactNode, onCreated?: () => void }) {
+export function CreateListingPopup({ children, onCreated }: { children: React.ReactNode; onCreated?: () => void }) {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
@@ -45,6 +46,10 @@ export function CreateListingPopup({ children, onCreated }: { children: React.Re
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Photo must be less than 5MB");
+        return;
+      }
       setPhoto(file);
       setPreview(URL.createObjectURL(file));
     }
@@ -86,8 +91,9 @@ export function CreateListingPopup({ children, onCreated }: { children: React.Re
       setPhoto(null);
       setPreview("");
       if (onCreated) onCreated();
-    } catch (err: any) {
-      setError(err.message || "Failed to create listing");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to create listing";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -103,15 +109,12 @@ export function CreateListingPopup({ children, onCreated }: { children: React.Re
           </div>
         </DialogHeader>
         <div className="flex flex-col md:flex-row gap-8 w-full p-6 pt-2">
-          <form
-            className="flex-1 flex flex-col gap-4 max-w-md"
-            onSubmit={handleSubmit}
-          >
+          <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-4 max-w-md">
             <div>
               <label className="block font-semibold mb-1">Photos</label>
-              <div className="border-2 border-dashed border-zinc-300 rounded-lg h-36 flex flex-col items-center justify-center bg-zinc-50 mb-2 relative">
+              <div className="border-2 border-dashed border-zinc-300 rounded-lg h-36 flex items-center justify-center bg-zinc-50 mb-2 relative">
                 {preview ? (
-                  <img src={preview} alt="Preview" className="h-full object-contain" />
+                  <Image src={preview} alt="Preview" className="object-contain" fill style={{ objectFit: "contain" }} />
                 ) : (
                   <>
                     <span className="text-3xl text-zinc-400 mb-2">&#8682;</span>
@@ -136,8 +139,10 @@ export function CreateListingPopup({ children, onCreated }: { children: React.Re
               required
             >
               <option value="">Select a category</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
               ))}
             </select>
             <Input type="number" min="0" step="0.01" placeholder="0.00" value={price} onChange={e => setPrice(e.target.value)} required />
@@ -155,17 +160,21 @@ export function CreateListingPopup({ children, onCreated }: { children: React.Re
             {error && <div className="text-red-500 text-sm mt-2">{error}</div>}
             {success && <div className="text-green-600 text-sm mt-2">Listing created!</div>}
           </form>
+
+          {/* Preview Panel */}
           <div className="flex-1 bg-white rounded-xl shadow p-6 flex flex-col gap-4 min-w-[320px]">
             <h2 className="font-bold text-lg mb-2">Preview</h2>
-            <div className="border rounded-lg h-36 bg-[repeating-linear-gradient(135deg,#e5e7eb_0_8px,#fff_8px_16px)] flex items-center justify-center mb-4">
-              {preview ? <img src={preview} alt="Preview" className="h-full object-contain" /> : null}
+            <div className="border rounded-lg h-36 bg-[repeating-linear-gradient(135deg,#e5e7eb_0_8px,#fff_8px_16px)] flex items-center justify-center mb-4 relative">
+              {preview && (
+                <Image src={preview} alt="Preview" fill style={{ objectFit: "contain" }} />
+              )}
             </div>
-            <div className="font-bold text-lg">Title: {title || ""}</div>
-            <div className="font-bold text-lg">Category: {category || ""}</div>
+            <div className="font-bold text-lg">Title: {title}</div>
+            <div className="font-bold text-lg">Category: {category}</div>
             <div className="font-bold text-lg">Price: {price ? `$${price}` : ""}</div>
-            <div className="font-bold text-lg">Location: {location || ""}</div>
-            <div className="font-bold text-lg">Email: {email || ""}</div>
-            <div className="font-bold text-lg mt-2 whitespace-pre-line">Description: {description || ""}</div>
+            <div className="font-bold text-lg">Location: {location}</div>
+            <div className="font-bold text-lg">Email: {email}</div>
+            <div className="font-bold text-lg mt-2 whitespace-pre-line">Description: {description}</div>
           </div>
         </div>
       </DialogContent>
