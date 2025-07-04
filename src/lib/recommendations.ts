@@ -30,7 +30,7 @@ export function getTopPicks(
   max = 6
 ): Product[] {
   // 1. Filter out out-of-stock, discontinued, or low-rated products
-  let filtered = products.filter(
+  const filtered = products.filter(
     (p) => p.inStock && !p.discontinued && p.rating >= 3.5
   );
 

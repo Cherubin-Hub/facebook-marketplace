@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { sendMarketplaceMessage } from "@/lib/messages";
 import { MessageSentDialog } from "@/components/message-sent-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FloatingLabelInput } from "@/components/ui/floating-label-input";
 
@@ -10,15 +10,13 @@ interface MessageSellerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sellerEmail: string;
-  sellerId?: string;
   itemId?: string;
-  buyerId?: string;
   subject?: string;
   body?: string;
   onMessageSent?: () => void;
 }
 
-export function MessageSellerDialog({ open, onOpenChange, sellerEmail, sellerId = "", itemId = "", buyerId = "", subject = "", body = "", onMessageSent }: MessageSellerDialogProps) {
+export function MessageSellerDialog({ open, onOpenChange, sellerEmail, itemId = "", subject = "", body = "", onMessageSent }: MessageSellerDialogProps) {
   const [form, setForm] = useState({ email: "", subject, body });
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,9 +115,6 @@ export function MessageSellerDialog({ open, onOpenChange, sellerEmail, sellerId 
               {error && <span className="absolute right-2 top-2 text-xs text-red-500 animate-pulse">!</span>}
             </div>
             <div className="flex justify-end gap-2 mt-4 w-full">
-              <DialogClose asChild>
-                <Button type="button" variant="ghost" className="rounded-xl font-semibold">Cancel</Button>
-              </DialogClose>
               <Button
                 type="submit"
                 disabled={sending || success}

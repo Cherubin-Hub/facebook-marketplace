@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MessageSellerDialog } from "@/components/message-seller-dialog";
 import { MessageSentDialog } from "@/components/message-sent-dialog";
@@ -116,7 +116,6 @@ export function ProductDetailsModal({ open, onOpenChange, product }: ProductDeta
             sellerEmail={product.email}
             subject={"Regarding: " + product.title}
             body={"Hi, I'm interested in your listing for '" + product.title + "'."}
-            sellerId={product.sellerId ?? ""}
             itemId={
               product.id !== undefined && product.id !== null
                 ? typeof product.id === 'string'
@@ -128,7 +127,6 @@ export function ProductDetailsModal({ open, onOpenChange, product }: ProductDeta
                     : ''
                 : ''
             }
-            buyerId={product.buyerId ?? ""}
             onMessageSent={() => {
               setMessageDialogOpen(false);
               setTimeout(() => setMessageSentOpen(true), 200);
