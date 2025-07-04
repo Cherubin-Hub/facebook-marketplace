@@ -1,5 +1,5 @@
 "use client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 export function MessageSentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
