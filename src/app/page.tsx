@@ -1,102 +1,295 @@
+
+
+"use client";
 import Image from "next/image";
+import { useState, useMemo, useEffect } from "react";
+// Custom hook to get current user ID from Supabase Auth
+function useCurrentUserId() {
+  const [userId, setUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data?.user?.id ?? null);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
+  }, []);
+  return userId;
+}
+import { supabase } from "@/lib/supabase";
+import { CategoryFilter } from "@/components/category-filter";
+import { ProductCard } from "@/components/product-card";
+import { ProductDetailsModal } from "@/components/product-details-modal";
+import { SearchBar } from "@/components/search-bar";
+import { getTopPicks, Product as ProductType, UserActivity } from "@/lib/recommendations";
+import { CreateListingPopup } from "@/components/create-listing-popup";
+
+const categories = [
+  "Vehicles",
+  "Property Rentals",
+  "Apparel",
+  "Classifieds",
+  "Electronics",
+  "Entertainment",
+  "Family",
+  "Free Stuff",
+  "Garden & Outdoor",
+  "Hobbies",
+  "Home Goods",
+  "Home Improvement",
+  "Home Sales",
+  "Musical Instruments",
+  "Office Supplies",
+  "Pet Supplies",
+  "Sporting Goods",
+  "Toys & Games",
+  "Buy and sell groups",
+];
+
+// Listings state, fetched from Supabase
+const initialProducts: ProductType[] = [];
+
+// Icon SVGs
+function EnvelopeIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="M3 7l9 6 9-6" />
+    </svg>
+  );
+}
+function BellIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M18 16v-5a6 6 0 10-12 0v5" />
+      <path d="M5 16h14" />
+      <path d="M9 20h6" />
+    </svg>
+  );
+}
+function UserIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 4-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // State for selected category, search, suggestions, and products
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [products, setProducts] = useState<ProductType[]>(initialProducts);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsProduct, setDetailsProduct] = useState<any | null>(null);
+  const userId = useCurrentUserId();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  // Simulate user activity (replace with real user data in production)
+  const user: UserActivity = {
+    purchaseHistory: ["Modern Sofa"],
+    browsingCategories: ["Electronics", "Home Goods"],
+    wishlist: ["Acoustic Guitar", "Designer Lamp"],
+    categoryAffinity: { "Electronics": 3, "Home Goods": 2, "Musical Instruments": 1 },
+  };
+
+  // Fetch listings from Supabase
+  async function fetchListings() {
+    setLoadingProducts(true);
+    const { data, error } = await supabase
+      .from("listings")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (!error && data) {
+      // Remove duplicates by id (if you have an id column)
+      // Map DB fields to ProductType
+  setProducts(
+    data.map((item: any) => ({
+      id: item.id,
+      sellerId: item.seller_id,
+      title: item.title,
+      price: item.price ? `$${item.price}` : "",
+      image: item.photo || "https://placehold.co/400x300?text=No+Image",
+      location: item.location || "",
+      time: item.created_at ? new Date(item.created_at).toLocaleString() : "Just now",
+      category: item.category || "",
+      inStock: true,
+      discontinued: false,
+      rating: 4.5, // Default or fetch from DB if available
+      trending: false,
+      description: item.description || "",
+      email: item.email || "",
+    }))
+  );
+    }
+    setLoadingProducts(false);
+  }
+
+  useEffect(() => {
+    fetchListings();
+  }, []);
+
+  // Top Picks logic
+  const topPicks = useMemo(() => {
+    let picks = getTopPicks(products, user, 6);
+    if (selectedCategory) {
+      picks = picks.filter((p) => p.category === selectedCategory);
+    }
+    if (search) {
+      picks = picks.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
+    }
+    return picks;
+  }, [products, selectedCategory, search]);
+
+  // Simulate real-time search suggestions
+  function handleSearchChange(val: string) {
+    setSearch(val);
+    if (val.length > 0) {
+      setSuggestions(
+        products
+          .map((p) => p.title)
+          .filter((t) => t.toLowerCase().includes(val.toLowerCase()))
+          .slice(0, 5)
+      );
+    } else {
+      setSuggestions([]);
+    }
+  }
+
+  function handleSuggestionClick(s: string) {
+    setSearch(s);
+    setSuggestions([]);
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-50 via-fuchsia-50 to-white dark:from-zinc-950 dark:via-zinc-900 dark:to-zinc-950">
+      {/* Header */}
+      <header className="w-full h-16 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 flex items-center px-8 justify-between shadow-sm">
+        <button
+          className="flex items-center gap-2 group focus:outline-none"
+          onClick={() => window.location.reload()}
+          aria-label="Refresh page"
+        >
+          <div className="bg-gradient-to-br from-blue-500 to-fuchsia-500 text-white rounded-full w-9 h-9 flex items-center justify-center font-bold text-lg shadow-md group-hover:scale-105 transition-transform">F</div>
+          <span className="font-extrabold text-xl tracking-tight bg-gradient-to-r from-blue-500 to-fuchsia-500 bg-clip-text text-transparent group-hover:underline">Marketplace Demo</span>
+        </button>
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4 justify-end">
+          <button
+            type="button"
+            className="rounded-full p-2 bg-white shadow-md hover:bg-blue-50 hover:shadow-lg transition-all border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            aria-label="Messages"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <EnvelopeIcon className="w-6 h-6 text-zinc-500" />
+          </button>
+          <button
+            type="button"
+            className="rounded-full p-2 bg-white shadow-md hover:bg-blue-50 hover:shadow-lg transition-all border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            aria-label="Notifications"
           >
-            Read our docs
-          </a>
+            <BellIcon className="w-6 h-6 text-zinc-500" />
+          </button>
+          <button
+            type="button"
+            className="rounded-full p-2 bg-white shadow-md hover:bg-blue-50 hover:shadow-lg transition-all border border-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            aria-label="Profile"
+          >
+            <UserIcon className="w-6 h-6 text-zinc-500" />
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </header>
+
+      <div className="flex flex-1 min-h-0">
+        {/* Sidebar */}
+        <aside className="hidden md:flex w-64 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-r border-zinc-200 dark:border-zinc-800 flex-col p-6 gap-8 min-h-full shadow-sm">
+          <nav className="flex flex-col gap-2 text-sm">
+            <CreateListingPopup onCreated={fetchListings}>
+              <button
+                className="font-semibold text-zinc-700 dark:text-zinc-200 mb-2 text-left hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded transition"
+                type="button"
+              >
+                Create new listing
+              </button>
+            </CreateListingPopup>
+            <ul className="flex flex-col gap-1 mb-4">
+              <li className="pl-4 py-1 text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded cursor-pointer transition-colors">Choose listing type</li>
+              <li className="pl-4 py-1 text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded cursor-pointer transition-colors">Your listings</li>
+              <li className="pl-4 py-1 text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800 rounded cursor-pointer transition-colors">Seller help</li>
+            </ul>
+            <span className="font-semibold text-zinc-700 dark:text-zinc-200 mb-2">Categories</span>
+            <ul className="flex flex-col gap-1">
+              {categories.map((cat) => (
+                <li
+                  key={cat}
+                  className={`pl-4 py-1 rounded cursor-pointer transition-colors ${cat === selectedCategory ? "bg-gradient-to-r from-blue-500 to-fuchsia-500 text-white font-semibold shadow" : "text-zinc-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-zinc-800"}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col p-4 md:p-10 gap-4">
+          <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-zinc-100">Today's Picks</h2>
+          <CategoryFilter
+            categories={categories}
+            selected={selectedCategory ?? ""}
+            onSelect={setSelectedCategory}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          <SearchBar
+            suggestions={suggestions}
+            value={search}
+            onChange={handleSearchChange}
+            onSearch={() => {}}
+            onSuggestionClick={handleSuggestionClick}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          <section className="mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {topPicks.map((p, i) => (
+                <ProductCard
+                  key={i}
+                  {...p}
+                  onClick={() => {
+                    // Find the full product info from products[] (which has DB fields)
+                    const full = products.find(prod => prod.title === p.title && prod.category === p.category);
+                    setDetailsProduct({
+                      ...p,
+                      // Ensure id is a number and not undefined or empty string
+                      id: typeof full?.id === "string" ? Number(full.id) : full?.id,
+                      sellerId: full?.sellerId,
+                      description: full?.description || "No description available.",
+                      email: full?.email || "seller@email.com",
+                      buyerId: userId,
+                    });
+                    setDetailsOpen(true);
+                  }}
+                />
+              ))}
+              {topPicks.length === 0 && (
+                <div className="col-span-full text-center text-zinc-500 py-12">No products found.</div>
+              )}
+            </div>
+          </section>
+        </main>
+      </div>
+
+      {/* Product Details Modal */}
+      <ProductDetailsModal
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        product={detailsProduct}
+      />
+
+      {/* Footer */}
+      <footer className="w-full h-14 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-center text-xs text-zinc-500 dark:text-zinc-400 shadow-inner">
+        © {new Date().getFullYear()} Marketplace. All rights reserved.
       </footer>
     </div>
   );
