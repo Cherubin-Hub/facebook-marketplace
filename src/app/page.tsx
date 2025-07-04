@@ -105,12 +105,12 @@ export default function Home() {
   const userId = useCurrentUserId();
 
   // Simulate user activity (replace with real user data in production)
-  const user: UserActivity = {
+  const user = useMemo<UserActivity>(() => ({
     purchaseHistory: ["Modern Sofa"],
     browsingCategories: ["Electronics", "Home Goods"],
     wishlist: ["Acoustic Guitar", "Designer Lamp"],
     categoryAffinity: { "Electronics": 3, "Home Goods": 2, "Musical Instruments": 1 },
-  };
+  }), []);
 
   // Fetch listings from Supabase
   async function fetchListings() {
@@ -247,7 +247,7 @@ export default function Home() {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col p-4 md:p-10 gap-4">
-          <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-zinc-100">Today's Picks</h2>
+          <h2 className="text-2xl font-bold mb-2 text-zinc-900 dark:text-zinc-100">Today&apos;s Picks</h2>
           <CategoryFilter
             categories={categories}
             selected={selectedCategory ?? ""}
