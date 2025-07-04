@@ -1,7 +1,7 @@
 
 
 "use client";
-import Image from "next/image";
+// import Image from "next/image";
 import { useState, useMemo, useEffect } from "react";
 // Custom hook to get current user ID from Supabase Auth
 function useCurrentUserId() {
@@ -85,9 +85,23 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [products, setProducts] = useState<ProductType[]>(initialProducts);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  // Removed unused loadingProducts state to fix lint error
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [detailsProduct, setDetailsProduct] = useState<any | null>(null);
+  // Use ProductType | null instead of any
+  // Use a type that matches ProductDetailsModalProps
+  type ProductDetailsType = {
+    id?: string | number;
+    sellerId?: string;
+    title: string;
+    price: string;
+    image: string;
+    location: string;
+    time: string;
+    description: string;
+    email: string;
+    buyerId?: string;
+  };
+  const [detailsProduct, setDetailsProduct] = useState<ProductDetailsType | null>(null);
   const userId = useCurrentUserId();
 
   // Simulate user activity (replace with real user data in production)
@@ -100,34 +114,30 @@ export default function Home() {
 
   // Fetch listings from Supabase
   async function fetchListings() {
-    setLoadingProducts(true);
     const { data, error } = await supabase
       .from("listings")
       .select("*")
       .order("created_at", { ascending: false });
     if (!error && data) {
-      // Remove duplicates by id (if you have an id column)
-      // Map DB fields to ProductType
-  setProducts(
-    data.map((item: any) => ({
-      id: item.id,
-      sellerId: item.seller_id,
-      title: item.title,
-      price: item.price ? `$${item.price}` : "",
-      image: item.photo || "https://placehold.co/400x300?text=No+Image",
-      location: item.location || "",
-      time: item.created_at ? new Date(item.created_at).toLocaleString() : "Just now",
-      category: item.category || "",
-      inStock: true,
-      discontinued: false,
-      rating: 4.5, // Default or fetch from DB if available
-      trending: false,
-      description: item.description || "",
-      email: item.email || "",
-    }))
-  );
+      setProducts(
+        data.map((item: Record<string, unknown>) => ({
+          id: String(item.id),
+          sellerId: item.seller_id as string,
+          title: item.title as string,
+          price: item.price ? `$${item.price}` : "",
+          image: (item.photo as string) || "https://placehold.co/400x300?text=No+Image",
+          location: (item.location as string) || "",
+          time: item.created_at ? new Date(item.created_at as string).toLocaleString() : "Just now",
+          category: (item.category as string) || "",
+          inStock: true,
+          discontinued: false,
+          rating: 4.5, // Default or fetch from DB if available
+          trending: false,
+          description: (item.description as string) || "",
+          email: (item.email as string) || "",
+        }))
+      );
     }
-    setLoadingProducts(false);
   }
 
   useEffect(() => {
@@ -144,7 +154,7 @@ export default function Home() {
       picks = picks.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()));
     }
     return picks;
-  }, [products, selectedCategory, search]);
+  }, [products, user, selectedCategory, search]);
 
   // Simulate real-time search suggestions
   function handleSearchChange(val: string) {
@@ -259,15 +269,15 @@ export default function Home() {
                   onClick={() => {
                     // Find the full product info from products[] (which has DB fields)
                     const full = products.find(prod => prod.title === p.title && prod.category === p.category);
-                    setDetailsProduct({
-                      ...p,
-                      // Ensure id is a number and not undefined or empty string
-                      id: typeof full?.id === "string" ? Number(full.id) : full?.id,
-                      sellerId: full?.sellerId,
-                      description: full?.description || "No description available.",
-                      email: full?.email || "seller@email.com",
-                      buyerId: userId,
-                    });
+                  setDetailsProduct({
+                    ...p,
+                    // Ensure id is a string
+                    id: String(full?.id),
+                    sellerId: full?.sellerId,
+                    description: (full?.description as string) || "No description available.",
+                    email: full?.email || "seller@email.com",
+                    buyerId: userId ?? undefined,
+                  });
                     setDetailsOpen(true);
                   }}
                 />
